@@ -1,0 +1,72 @@
+"use client";
+
+import Link from "next/link";
+import { useAuth } from "../lib/AuthContext";
+import { supabase } from "../lib/supabase";
+
+export default function Navbar() {
+  const { session, loading } = useAuth();
+
+  return (
+    <nav className="fixed top-0 left-0 right-0 z-50 bg-white/80 dark:bg-black/80 backdrop-blur-md border-b border-zinc-200 dark:border-zinc-800 transition-colors">
+      <div className="max-w-7xl mx-auto px-6 h-20 flex items-center justify-between">
+        {/* Logo */}
+        <Link href="/" className="group flex items-center gap-2">
+          <span className="text-2xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-blue-600 to-cyan-500 dark:from-blue-400 dark:to-cyan-300 tracking-tight">
+            Oceanora
+          </span>
+        </Link>
+
+        {/* Desktop Links */}
+        <div className="hidden md:flex items-center gap-8">
+          {["Hotels", "Apartments", "Cars", "Tours"].map((item) => (
+            <Link
+              key={item}
+              href={`/${item.toLowerCase()}`}
+              className="text-sm font-medium text-zinc-600 hover:text-blue-600 dark:text-zinc-300 dark:hover:text-cyan-400 transition-colors relative after:absolute after:bottom-0 after:left-0 after:h-[2px] after:w-0 after:bg-blue-600 dark:after:bg-cyan-400 hover:after:w-full after:transition-all after:duration-300 pb-1"
+            >
+              {item}
+            </Link>
+          ))}
+        </div>
+
+        {/* CTA */}
+        <div className="flex items-center gap-4">
+          {!loading && session ? (
+             <>
+               <Link
+                 href="/dashboard"
+                 className="hidden sm:inline-block text-sm font-semibold text-zinc-900 dark:text-white hover:text-blue-600 dark:hover:text-cyan-400 transition-colors"
+               >
+                 My Profile
+               </Link>
+               <button
+                 onClick={() => supabase.auth.signOut()}
+                 className="px-4 py-2 bg-zinc-100 dark:bg-zinc-800 hover:bg-zinc-200 dark:hover:bg-zinc-700 text-zinc-900 dark:text-white text-sm font-semibold rounded-full transition-colors"
+               >
+                 Sign Out
+               </button>
+             </>
+          ) : !loading ? (
+             <>
+               <Link
+                 href="/sign-in"
+                 className="hidden sm:inline-block text-sm font-medium text-zinc-900 dark:text-white hover:opacity-80 transition-opacity"
+               >
+                 Sign In
+               </Link>
+               <Link
+                 href="/#book"
+                 className="px-5 py-2.5 bg-gradient-to-r from-blue-600 to-cyan-500 hover:from-blue-700 hover:to-cyan-600 text-white text-sm font-semibold rounded-full shadow-lg hover:shadow-cyan-500/25 transition-all active:scale-95"
+               >
+                 Book Now
+               </Link>
+             </>
+          ) : (
+            <div className="w-16 h-8 animate-pulse bg-zinc-200 dark:bg-zinc-800 rounded-full" />
+          )}
+        </div>
+      </div>
+    </nav>
+  );
+}

@@ -1,7 +1,9 @@
 import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
-  /* config options here */
+  // Allow local network IP for testing
+  // @ts-ignore
+  allowedDevOrigins: ["192.168.88.42"],
 };
 
 export default nextConfig;
