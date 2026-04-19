@@ -30,6 +30,15 @@ export default function ToursPage() {
       .order("created_at", { ascending: false })
 
     if (error) {
+      if (error.code === 'PGRST303' || error.message?.includes('JWT expired')) {
+        await supabase.auth.signOut()
+        const { data: retryData } = await supabase
+          .from("listings").select("*").ilike("category", "%tour%")
+          .order("created_at", { ascending: false })
+        setListings(retryData || [])
+        setLoading(false)
+        return
+      }
       console.error(error)
       setLoading(false)
       return

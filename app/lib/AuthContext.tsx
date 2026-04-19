@@ -18,17 +18,33 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    // Listen for changes on auth state (login, sighout, etc.)
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
-      setSession(session);
-      setUser(session?.user ?? null);
+    // Listen for auth state changes (login, signout, token refresh, etc.)
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
+      if (event === 'TOKEN_REFRESHED') {
+        // Token was refreshed successfully
+        setSession(session);
+        setUser(session?.user ?? null);
+      } else if (event === 'SIGNED_OUT') {
+        setSession(null);
+        setUser(null);
+      } else {
+        setSession(session);
+        setUser(session?.user ?? null);
+      }
       setLoading(false);
     });
 
-    // Check active sessions and sets the user
-    supabase.auth.getSession().then(({ data: { session } }) => {
-      setSession(session);
-      setUser(session?.user ?? null);
+    // Check active sessions on mount
+    supabase.auth.getSession().then(async ({ data: { session }, error }) => {
+      if (error || (session && isTokenExpired(session))) {
+        // Session exists but token is expired and couldn't be refreshed — sign out
+        await supabase.auth.signOut();
+        setSession(null);
+        setUser(null);
+      } else {
+        setSession(session);
+        setUser(session?.user ?? null);
+      }
       setLoading(false);
     });
 
@@ -43,5 +59,12 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
     </AuthContext.Provider>
   );
 };
+
+// Check if the JWT access token is expired
+function isTokenExpired(session: Session): boolean {
+  if (!session.expires_at) return false;
+  // expires_at is in seconds since epoch
+  return Date.now() / 1000 > session.expires_at;
+}
 
 export const useAuth = () => useContext(AuthContext);

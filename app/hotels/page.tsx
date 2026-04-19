@@ -30,6 +30,18 @@ export default function HotelsPage() {
       .order("created_at", { ascending: false })
 
     if (error) {
+      // If JWT expired, sign out stale session and retry with anon key
+      if (error.code === 'PGRST303' || error.message?.includes('JWT expired')) {
+        await supabase.auth.signOut()
+        const { data: retryData } = await supabase
+          .from("listings")
+          .select("*")
+          .ilike("category", "%hotel%")
+          .order("created_at", { ascending: false })
+        setListings(retryData || [])
+        setLoading(false)
+        return
+      }
       console.error(error)
       setLoading(false)
       return

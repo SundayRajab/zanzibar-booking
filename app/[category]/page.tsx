@@ -33,6 +33,15 @@ export default function CategoryPage({ params }: { params: Promise<{ category: s
       .order("created_at", { ascending: false })
 
     if (error) {
+      if (error.code === 'PGRST303' || error.message?.includes('JWT expired')) {
+        await supabase.auth.signOut()
+        const { data: retryData } = await supabase
+          .from("listings").select("*").eq("category", categoryStr.toLowerCase())
+          .order("created_at", { ascending: false })
+        setListings(retryData || [])
+        setLoading(false)
+        return
+      }
       console.error(error)
       setLoading(false)
       return

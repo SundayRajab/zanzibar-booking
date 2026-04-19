@@ -9,27 +9,50 @@ type Profile = {
   loyalty_points: number;
 }
 
+type Booking = {
+  id: string;
+  start_date: string;
+  end_date: string;
+  status: string;
+  payment_status: string;
+  total_price: number;
+  listings: {
+    title: string;
+    category: string;
+  }
+}
+
 export default function DashboardOverview() {
   const { user } = useAuth();
   const [profile, setProfile] = useState<Profile | null>(null);
+  const [bookings, setBookings] = useState<Booking[]>([]);
 
   useEffect(() => {
     if (!user) return;
-    const fetchProfile = async () => {
-      // Intentionally ignoring error handling here so the page still loads the fallback UI if SQL hasn't been run yet
-      const { data } = await supabase.from('profiles').select('*').eq('id', user.id).single();
-      if (data) setProfile(data);
+    const fetchData = async () => {
+      // Fetch Profile
+      const { data: profileData } = await supabase.from('profiles').select('*').eq('id', user.id).single();
+      if (profileData) setProfile(profileData);
+
+      // Fetch Bookings
+      const { data: bookingData } = await supabase
+        .from('bookings')
+        .select('*, listings(title, category)')
+        .eq('user_id', user.id)
+        .order('created_at', { ascending: false });
+      
+      if (bookingData) setBookings(bookingData);
     };
-    fetchProfile();
+    fetchData();
   }, [user]);
 
   return (
     <div className="space-y-6">
       <h1 className="text-3xl font-bold text-black dark:text-white mb-8">Dashboard Overview</h1>
       
-      <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         <div className="bg-gradient-to-br from-blue-600 to-cyan-500 rounded-3xl p-8 text-white shadow-xl shadow-cyan-500/20">
-          <h3 className="text-blue-100 font-medium mb-1">Oceanora Member</h3>
+          <h3 className="text-blue-100 font-medium mb-1 capitalize">{profile?.full_name?.split(' ')[0] || 'User'} Member</h3>
           <p className="text-2xl font-bold mb-6 truncate">{profile?.full_name || user?.email}</p>
           <div className="flex items-end justify-between">
             <div>
@@ -41,20 +64,23 @@ export default function DashboardOverview() {
         </div>
         
         <div className="bg-white dark:bg-zinc-900/80 border border-zinc-200 dark:border-zinc-800 rounded-3xl p-8 shadow-sm">
-          <h3 className="text-lg font-bold text-black dark:text-white mb-4">Saved Preferences</h3>
+          <h3 className="text-lg font-bold text-black dark:text-white mb-6">Active Trips</h3>
           <div className="space-y-4">
-             <div className="flex justify-between items-center py-3 border-b border-zinc-100 dark:border-zinc-800">
-               <span className="text-sm text-zinc-600 dark:text-zinc-400">Dietary Requirements</span>
-               <span className="text-sm font-medium text-black dark:text-white">None</span>
-             </div>
-             <div className="flex justify-between items-center py-3 border-b border-zinc-100 dark:border-zinc-800">
-               <span className="text-sm text-zinc-600 dark:text-zinc-400">Bed Preference</span>
-               <span className="text-sm font-medium text-black dark:text-white">King Size</span>
-             </div>
-             <div className="flex justify-between items-center py-3">
-               <span className="text-sm text-zinc-600 dark:text-zinc-400">Currency</span>
-               <span className="text-sm font-medium text-black dark:text-white">USD ($)</span>
-             </div>
+             {bookings.length > 0 ? bookings.slice(0, 3).map((b) => (
+                <div key={b.id} className="flex justify-between items-center p-4 bg-zinc-50 dark:bg-zinc-950 rounded-2xl border border-zinc-100 dark:border-zinc-800">
+                  <div className="flex flex-col">
+                    <span className="text-sm font-bold text-black dark:text-white truncate max-w-[150px]">{b.listings?.title}</span>
+                    <span className="text-xs text-zinc-500">{new Date(b.start_date).toLocaleDateString()}</span>
+                  </div>
+                  <div className="text-right">
+                    <span className={`text-[10px] uppercase font-extrabold px-2 py-0.5 rounded-full ${b.payment_status === 'paid' ? 'bg-green-100 text-green-700' : 'bg-yellow-100 text-yellow-700'}`}>
+                      {b.payment_status}
+                    </span>
+                  </div>
+                </div>
+             )) : (
+                <p className="text-sm text-zinc-500 py-4 italic">No active bookings found.</p>
+             )}
           </div>
         </div>
       </div>

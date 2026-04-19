@@ -2,17 +2,29 @@
 
 import { useAuth } from "../lib/AuthContext";
 import { useRouter, usePathname } from "next/navigation";
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import Link from "next/link";
+import { supabase } from "../lib/supabase";
 
 export default function DashboardLayout({ children }: { children: React.ReactNode }) {
   const { user, loading } = useAuth();
   const router = useRouter();
   const pathname = usePathname();
+  const [role, setRole] = useState<string>("user");
 
   useEffect(() => {
     if (!loading && !user) {
       router.push("/sign-in");
+    }
+    if (user) {
+      supabase
+        .from("profiles")
+        .select("role")
+        .eq("id", user.id)
+        .single()
+        .then(({ data }) => {
+          if (data?.role) setRole(data.role);
+        });
     }
   }, [user, loading, router]);
 
@@ -24,11 +36,18 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
     );
   }
 
-  const navItems = [
-    { name: "Overview", path: "/dashboard" },
-    { name: "My Bookings", path: "/dashboard/bookings" },
-    { name: "Settings", path: "/dashboard/settings" },
+  const guestNav = [
+    { name: "Overview", path: "/dashboard", icon: "📊" },
+    { name: "My Bookings", path: "/dashboard/bookings", icon: "🗓️" },
   ];
+
+  const providerNav = [
+    { name: "Provider Hub", path: "/dashboard/provider", icon: "🏠" },
+  ];
+
+  const navItems = role === "provider" || role === "admin"
+    ? [...guestNav, ...providerNav]
+    : guestNav;
 
   return (
     <div className="max-w-7xl mx-auto px-6 py-12 flex flex-col md:flex-row gap-8 min-h-[80vh]">
@@ -37,6 +56,11 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
           <div className="mb-6 px-4">
             <h2 className="text-xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-blue-600 to-cyan-500">My Account</h2>
             <p className="text-sm text-zinc-500 truncate">{user.email}</p>
+            {(role === "provider" || role === "admin") && (
+              <span className="inline-block mt-2 text-[10px] px-2 py-0.5 bg-purple-100 dark:bg-purple-900/30 text-purple-700 dark:text-purple-300 rounded-full font-bold uppercase tracking-widest">
+                {role}
+              </span>
+            )}
           </div>
           <nav className="flex flex-col gap-1">
             {navItems.map((item) => {
@@ -45,8 +69,13 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
                 <Link
                   key={item.path}
                   href={item.path}
-                  className={`px-4 py-2.5 rounded-xl text-sm font-medium transition-colors ${isActive ? "bg-blue-50 text-blue-700 dark:bg-blue-900/30 dark:text-cyan-400" : "text-zinc-600 dark:text-zinc-400 hover:bg-zinc-100 dark:hover:bg-zinc-800/50"}`}
+                  className={`px-4 py-2.5 rounded-xl text-sm font-medium transition-colors flex items-center gap-2.5 ${
+                    isActive
+                      ? "bg-blue-50 text-blue-700 dark:bg-blue-900/30 dark:text-cyan-400"
+                      : "text-zinc-600 dark:text-zinc-400 hover:bg-zinc-100 dark:hover:bg-zinc-800/50"
+                  }`}
                 >
+                  <span className="text-base">{item.icon}</span>
                   {item.name}
                 </Link>
               );

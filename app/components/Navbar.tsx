@@ -33,37 +33,44 @@ export default function Navbar() {
         {/* CTA */}
         <div className="flex items-center gap-4">
           {!loading && session ? (
-             <>
-               <Link
-                 href="/dashboard"
-                 className="hidden sm:inline-block text-sm font-semibold text-zinc-900 dark:text-white hover:text-blue-600 dark:hover:text-cyan-400 transition-colors"
-               >
-                 My Profile
-               </Link>
-               <button
-                 onClick={() => supabase.auth.signOut()}
-                 className="px-4 py-2 bg-zinc-100 dark:bg-zinc-800 hover:bg-zinc-200 dark:hover:bg-zinc-700 text-zinc-900 dark:text-white text-sm font-semibold rounded-full transition-colors"
-               >
-                 Sign Out
-               </button>
-             </>
+             <div className="flex items-center gap-4">
+                <Link
+                  href="/dashboard"
+                  className="hidden sm:inline-flex items-center gap-2 px-4 py-2 text-sm font-semibold text-zinc-900 dark:text-white hover:bg-zinc-100 dark:hover:bg-zinc-800 rounded-full transition-colors"
+                >
+                  <span className="w-2 h-2 rounded-full bg-green-500 animate-pulse" />
+                  Dashboard
+                </Link>
+                <button
+                  onClick={async () => {
+                    await supabase.auth.signOut();
+                    window.location.href = '/';
+                  }}
+                  className="px-4 py-2 bg-zinc-900 dark:bg-white text-white dark:text-black text-sm font-bold rounded-full hover:opacity-90 transition-all active:scale-95"
+                >
+                  Sign Out
+                </button>
+             </div>
           ) : !loading ? (
              <>
                <Link
                  href="/sign-in"
-                 className="hidden sm:inline-block text-sm font-medium text-zinc-900 dark:text-white hover:opacity-80 transition-opacity"
+                 className="hidden sm:inline-block text-sm font-medium text-zinc-600 dark:text-zinc-400 hover:text-blue-600 dark:hover:text-cyan-400 transition-colors"
                >
                  Sign In
                </Link>
                <Link
-                 href="/#book"
-                 className="px-5 py-2.5 bg-gradient-to-r from-blue-600 to-cyan-500 hover:from-blue-700 hover:to-cyan-600 text-white text-sm font-semibold rounded-full shadow-lg hover:shadow-cyan-500/25 transition-all active:scale-95"
+                 href="/sign-up"
+                 className="px-6 py-2.5 bg-gradient-to-r from-blue-600 to-cyan-500 hover:from-blue-700 hover:to-cyan-600 text-white text-sm font-bold rounded-full shadow-lg shadow-blue-500/25 transition-all active:scale-95"
                >
-                 Book Now
+                 Get Started
                </Link>
              </>
           ) : (
-            <div className="w-16 h-8 animate-pulse bg-zinc-200 dark:bg-zinc-800 rounded-full" />
+            <div className="flex gap-2">
+              <div className="w-20 h-9 animate-pulse bg-zinc-200 dark:bg-zinc-800 rounded-full" />
+              <div className="w-24 h-9 animate-pulse bg-zinc-200 dark:bg-zinc-800 rounded-full" />
+            </div>
           )}
         </div>
       </div>

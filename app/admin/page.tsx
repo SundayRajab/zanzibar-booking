@@ -10,15 +10,23 @@ type Listing = {
   location: string
   price: number
   images: string[]
+  details?: Record<string, any>
 }
 
 type Booking = {
   id: string
   user_id: string
   listing_id: string
-  booking_date: string
+  booking_date?: string // Fallback for old schema
+  start_date: string
+  end_date: string
   status: string
+  payment_status: string
   total_price: number
+  booking_details?: Record<string, any>
+  customer_name?: string
+  customer_email?: string
+  customer_phone?: string
   listings?: Listing
 }
 
@@ -34,6 +42,7 @@ export default function AdminDashboard() {
   const [location, setLocation] = useState("")
   const [price, setPrice] = useState("")
   const [imageUrl, setImageUrl] = useState("")
+  const [details, setDetails] = useState<Record<string, string>>({})
   const [submitting, setSubmitting] = useState(false)
 
   useEffect(() => {
@@ -72,6 +81,38 @@ export default function AdminDashboard() {
     }
   }
 
+  const handleApprove = async (booking: Booking) => {
+    // 1. Update DB to approved
+    const { error } = await supabase.from("bookings").update({ status: 'approved' }).eq("id", booking.id)
+    if (error) {
+      alert("Error approving: " + error.message)
+      return
+    }
+
+    // 2. Trigger Automated Payment Link Email
+    try {
+      const res = await fetch('/api/send-payment-link', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          bookingId: booking.id,
+          customerEmail: booking.customer_email || 'test@example.com',
+          customerName: booking.customer_name || 'Guest',
+          title: booking.listings?.title || 'Booking Details',
+          price: booking.total_price
+        })
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || 'Server error');
+      
+      alert(`Booking approved! payment link ${data.simulated ? 'simulated (Check server console, missing Resend API key)' : 'emailed'} successfully.`)
+    } catch (err: any) {
+      alert("Approved, but failed to send email: " + err.message)
+    }
+
+    fetchBookings()
+  }
+
   const handleAdd = async (e: React.FormEvent) => {
     e.preventDefault()
     setSubmitting(true)
@@ -82,7 +123,8 @@ export default function AdminDashboard() {
       location,
       price: parseFloat(price),
       images: imageUrl ? [imageUrl] : [],
-      description: "Added from Admin Panel"
+      description: "Added from Admin Panel",
+      details
     }
 
     const { error } = await supabase.from("listings").insert([newListing])
@@ -95,6 +137,7 @@ export default function AdminDashboard() {
       setLocation("")
       setPrice("")
       setImageUrl("")
+      setDetails({})
       fetchListings()
     }
     setSubmitting(false)
@@ -147,6 +190,50 @@ export default function AdminDashboard() {
               <div>
                 <label className="block text-xs font-semibold text-zinc-500 uppercase tracking-wide mb-1.5">Image URL (Optional)</label>
                 <input type="url" placeholder="https://..." value={imageUrl} onChange={e => setImageUrl(e.target.value)} className="w-full px-4 py-2.5 rounded-xl bg-zinc-50 dark:bg-zinc-950 border border-zinc-200 dark:border-zinc-800 focus:ring-2 focus:ring-blue-500 outline-none text-sm dark:text-white transition-all"/>
+              </div>
+
+              <div className="pt-4 border-t border-zinc-200 dark:border-zinc-800">
+                <h3 className="text-sm font-bold text-black dark:text-white mb-3">Category Features</h3>
+                {category === 'hotels' || category === 'apartments' ? (
+                  <div className="space-y-4">
+                    <div>
+                      <label className="block text-xs font-semibold text-zinc-500 uppercase tracking-wide mb-1.5">Room Types Provided</label>
+                      <input type="text" placeholder="e.g. Single, Double, Suite" value={details.room_types || ''} onChange={e => setDetails({...details, room_types: e.target.value})} className="w-full px-4 py-2.5 rounded-xl bg-zinc-50 dark:bg-zinc-950 border border-zinc-200 dark:border-zinc-800 focus:ring-2 focus:ring-blue-500 outline-none text-sm dark:text-white transition-all" />
+                    </div>
+                    <div>
+                      <label className="block text-xs font-semibold text-zinc-500 uppercase tracking-wide mb-1.5">Max Target Guests</label>
+                      <input type="number" placeholder="2" value={details.max_guests || ''} onChange={e => setDetails({...details, max_guests: e.target.value})} className="w-full px-4 py-2.5 rounded-xl bg-zinc-50 dark:bg-zinc-950 border border-zinc-200 dark:border-zinc-800 focus:ring-2 focus:ring-blue-500 outline-none text-sm dark:text-white transition-all" />
+                    </div>
+                  </div>
+                ) : category === 'cars' ? (
+                  <div className="grid grid-cols-2 gap-4">
+                    <div>
+                      <label className="block text-xs font-semibold text-zinc-500 uppercase tracking-wide mb-1.5">Transmission</label>
+                      <select value={details.transmission || 'Automatic'} onChange={e => setDetails({...details, transmission: e.target.value})} className="w-full px-4 py-2.5 rounded-xl bg-zinc-50 dark:bg-zinc-950 border border-zinc-200 dark:border-zinc-800 focus:ring-2 focus:ring-blue-500 outline-none text-sm dark:text-white transition-all">
+                        <option value="Automatic">Automatic</option>
+                        <option value="Manual">Manual</option>
+                      </select>
+                    </div>
+                    <div>
+                      <label className="block text-xs font-semibold text-zinc-500 uppercase tracking-wide mb-1.5">Seats</label>
+                      <input type="number" placeholder="4" value={details.seats || ''} onChange={e => setDetails({...details, seats: e.target.value})} className="w-full px-4 py-2.5 rounded-xl bg-zinc-50 dark:bg-zinc-950 border border-zinc-200 dark:border-zinc-800 focus:ring-2 focus:ring-blue-500 outline-none text-sm dark:text-white transition-all" />
+                    </div>
+                  </div>
+                ) : category === 'tours' ? (
+                  <div className="space-y-4">
+                    <div>
+                      <label className="block text-xs font-semibold text-zinc-500 uppercase tracking-wide mb-1.5">Tour Duration</label>
+                      <input type="text" placeholder="e.g. 4 Hours / Full Day" value={details.duration || ''} onChange={e => setDetails({...details, duration: e.target.value})} className="w-full px-4 py-2.5 rounded-xl bg-zinc-50 dark:bg-zinc-950 border border-zinc-200 dark:border-zinc-800 focus:ring-2 focus:ring-blue-500 outline-none text-sm dark:text-white transition-all" />
+                    </div>
+                    <div>
+                      <label className="block text-xs font-semibold text-zinc-500 uppercase tracking-wide mb-1.5">Hotel Pickup Included</label>
+                      <select value={details.pickup || 'Yes'} onChange={e => setDetails({...details, pickup: e.target.value})} className="w-full px-4 py-2.5 rounded-xl bg-zinc-50 dark:bg-zinc-950 border border-zinc-200 dark:border-zinc-800 focus:ring-2 focus:ring-blue-500 outline-none text-sm dark:text-white transition-all">
+                         <option value="Yes">Yes</option>
+                         <option value="No">No</option>
+                      </select>
+                    </div>
+                  </div>
+                ) : null}
               </div>
               <button disabled={submitting} type="submit" className="w-full mt-4 py-3 bg-gradient-to-r from-blue-600 to-cyan-500 text-white font-semibold rounded-xl hover:opacity-90 transition-opacity flex justify-center text-sm shadow-md">
                 {submitting ? "Adding..." : "Publish Listing"}
@@ -224,36 +311,59 @@ export default function AdminDashboard() {
                 <div key={booking.id} className="bg-white dark:bg-zinc-900/40 border border-zinc-200 dark:border-zinc-800 rounded-2xl p-5 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 hover:border-zinc-300 dark:hover:border-zinc-700 transition-colors">
                   <div className="flex-grow">
                     <div className="flex items-center gap-3 mb-2">
-                       <span className={`px-2.5 py-1 text-xs font-bold rounded-lg uppercase tracking-wider ${booking.status === 'confirmed' ? 'bg-green-100 text-green-700 dark:bg-green-900/40 dark:text-green-400' : booking.status === 'rejected' ? 'bg-red-100 text-red-700 dark:bg-red-900/40 dark:text-red-400' : 'bg-yellow-100 text-yellow-700 dark:bg-yellow-900/40 dark:text-yellow-400'}`}>
+                       <span className={`px-2.5 py-1 text-xs font-bold rounded-lg uppercase tracking-wider ${booking.status === 'confirmed' ? 'bg-green-100 text-green-700 dark:bg-green-900/40 dark:text-green-400' : booking.status === 'approved' ? 'bg-blue-100 text-blue-700 dark:bg-blue-900/40 dark:text-blue-400' : booking.status === 'rejected' ? 'bg-red-100 text-red-700 dark:bg-red-900/40 dark:text-red-400' : 'bg-yellow-100 text-yellow-700 dark:bg-yellow-900/40 dark:text-yellow-400'}`}>
                          {booking.status}
                        </span>
+                       <span className={`px-2.5 py-1 text-xs font-bold rounded-lg uppercase tracking-wider ${booking.payment_status === 'paid' ? 'bg-indigo-100 text-indigo-700 dark:bg-indigo-900/40 dark:text-indigo-400' : 'bg-zinc-100 text-zinc-700 dark:bg-zinc-800 dark:text-zinc-400'}`}>
+                         {booking.payment_status || 'Unpaid'}
+                       </span>
                        <span className="text-sm font-semibold text-zinc-500 dark:text-zinc-400">
-                         {new Date(booking.booking_date).toLocaleDateString()}
+                         {booking.start_date ? `${new Date(booking.start_date).toLocaleDateString()} - ${new Date(booking.end_date).toLocaleDateString()}` : new Date(booking.booking_date!).toLocaleDateString()}
                        </span>
                     </div>
                     <h3 className="font-bold text-lg text-black dark:text-white leading-tight">
                       {booking.listings?.title || "Unknown Listing"}
                     </h3>
-                    <div className="flex flex-wrap items-center gap-2 mt-2 text-sm text-zinc-600 dark:text-zinc-400">
-                      <span>Total: <strong className="text-blue-600 dark:text-cyan-400">${booking.total_price}</strong></span>
-                      <span>•</span>
-                      <span className="text-xs text-zinc-400" title={booking.user_id}>User ID: {booking.user_id.slice(0,8)}...</span>
+                    <div className="flex flex-col gap-1 mt-2 text-sm text-zinc-600 dark:text-zinc-400">
+                      <div>Total: <strong className="text-blue-600 dark:text-cyan-400">${booking.total_price}</strong></div>
+                      {booking.customer_name && (
+                         <div className="text-xs">
+                           👤 {booking.customer_name} | ✉️ {booking.customer_email} | 📞 {booking.customer_phone}
+                         </div>
+                      )}
                     </div>
+                    {booking.booking_details && Object.keys(booking.booking_details).length > 0 && (
+                      <div className="mt-3 p-3 bg-zinc-50 dark:bg-zinc-800/80 border border-zinc-200 dark:border-zinc-700 rounded-lg text-xs text-zinc-600 dark:text-zinc-300">
+                        <strong className="block mb-1.5 text-black dark:text-white uppercase tracking-wider text-[10px]">Customer Options:</strong>
+                        <ul className="list-disc pl-4 space-y-1">
+                          {Object.entries(booking.booking_details).map(([key, val]) => (
+                            <li key={key}><span className="capitalize font-medium">{key.replace(/_/g, ' ')}:</span> {String(val)}</li>
+                          ))}
+                        </ul>
+                      </div>
+                    )}
                   </div>
                   {booking.status === 'pending' && (
                     <div className="flex gap-2 shrink-0">
-                      <button onClick={() => updateBookingStatus(booking.id, 'confirmed')} className="px-4 py-2 bg-green-50 text-green-600 hover:bg-green-100 dark:bg-green-900/20 dark:text-green-400 dark:hover:bg-green-900/40 rounded-lg text-sm font-bold transition-colors">
-                        Approve
+                      <button onClick={() => handleApprove(booking)} className="px-4 py-2 bg-green-50 text-green-600 hover:bg-green-100 dark:bg-green-900/20 dark:text-green-400 dark:hover:bg-green-900/40 rounded-lg text-sm font-bold transition-colors shadow-sm border border-green-200 dark:border-green-800/50">
+                        Approve & Send Payment Link
                       </button>
                       <button onClick={() => updateBookingStatus(booking.id, 'rejected')} className="px-4 py-2 bg-red-50 text-red-600 hover:bg-red-100 dark:bg-red-900/20 dark:text-red-400 dark:hover:bg-red-900/40 rounded-lg text-sm font-bold transition-colors">
                         Reject
                       </button>
                     </div>
                   )}
-                  {booking.status !== 'pending' && (
+                  {booking.status === 'approved' && booking.payment_status !== 'paid' && (
+                    <div className="flex shrink-0">
+                      <div className="px-4 py-2 bg-blue-50 text-blue-600 dark:bg-blue-900/20 dark:text-blue-400 rounded-lg text-sm font-semibold border border-blue-200 dark:border-blue-800/50">
+                        Awaiting Payment Checkout
+                      </div>
+                    </div>
+                  )}
+                  {booking.status !== 'pending' && booking.status !== 'approved' && (
                     <div className="flex gap-2 shrink-0">
                       <button onClick={() => updateBookingStatus(booking.id, 'pending')} className="px-4 py-2 bg-zinc-100 text-zinc-600 hover:bg-zinc-200 dark:bg-zinc-800 dark:text-zinc-400 dark:hover:bg-zinc-700 rounded-lg text-xs font-semibold transition-colors">
-                        Reset Status
+                        Reset
                       </button>
                     </div>
                   )}

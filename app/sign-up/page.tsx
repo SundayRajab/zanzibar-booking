@@ -10,6 +10,7 @@ export default function SignUp() {
   const [fullName, setFullName] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [role, setRole] = useState("user"); // default to guest
   const [loading, setLoading] = useState(false);
   const [errorMsg, setErrorMsg] = useState("");
   const [success, setSuccess] = useState(false);
@@ -25,6 +26,7 @@ export default function SignUp() {
       options: {
         data: {
           full_name: fullName,
+          role: role,
         },
       },
     });
@@ -33,7 +35,6 @@ export default function SignUp() {
       setErrorMsg(error.message);
     } else {
       setSuccess(true);
-      // Optional: Wait and push to dashboard
       setTimeout(() => router.push("/dashboard"), 2000);
     }
     setLoading(false);
@@ -60,10 +61,30 @@ export default function SignUp() {
         {success ? (
           <div className="p-6 text-center text-green-700 bg-green-50 rounded-xl dark:bg-green-900/20 dark:text-green-400 border border-green-200 dark:border-green-800/50">
             <h3 className="font-bold text-lg mb-2">Registration Successful!</h3>
-            <p className="text-sm">You are now logged in. Connecting you to your dashboard...</p>
+            <p className="text-sm">Connecting you to your dashboard...</p>
           </div>
         ) : (
           <form onSubmit={handleSignUp} className="space-y-5">
+            <div>
+              <label className="block text-sm font-medium text-zinc-700 dark:text-zinc-300 mb-2">Account Type</label>
+              <div className="grid grid-cols-2 gap-4">
+                <button
+                  type="button"
+                  onClick={() => setRole("user")}
+                  className={`py-3 px-4 rounded-xl border-2 transition-all ${role === "user" ? "border-blue-500 bg-blue-50/50 dark:bg-blue-900/20 text-blue-700 dark:text-blue-300 font-semibold" : "border-zinc-200 dark:border-zinc-800 text-zinc-500 hover:border-blue-200"}`}
+                >
+                  Guest
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setRole("provider")}
+                  className={`py-3 px-4 rounded-xl border-2 transition-all ${role === "provider" ? "border-blue-500 bg-blue-50/50 dark:bg-blue-900/20 text-blue-700 dark:text-blue-300 font-semibold" : "border-zinc-200 dark:border-zinc-800 text-zinc-500 hover:border-blue-200"}`}
+                >
+                  Provider
+                </button>
+              </div>
+            </div>
+
             <div>
               <label className="block text-sm font-medium text-zinc-700 dark:text-zinc-300 mb-2">Full Name</label>
               <input type="text" value={fullName} onChange={(e) => setFullName(e.target.value)} className="w-full px-4 py-3 rounded-xl bg-zinc-50 dark:bg-zinc-950 border border-zinc-200 dark:border-zinc-800 focus:ring-2 focus:ring-blue-500 outline-none transition-all dark:text-white" placeholder="John Doe" required />
