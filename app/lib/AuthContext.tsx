@@ -7,54 +7,65 @@ import { supabase } from "./supabase";
 type AuthContextType = {
   user: User | null;
   session: Session | null;
+  role: 'admin' | 'provider' | 'user' | null;
+  permissions: string[];
   loading: boolean;
 };
 
-const AuthContext = createContext<AuthContextType>({ user: null, session: null, loading: true });
+const AuthContext = createContext<AuthContextType>({ user: null, session: null, role: null, permissions: [], loading: true });
 
 export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
   const [user, setUser] = useState<User | null>(null);
   const [session, setSession] = useState<Session | null>(null);
+  const [role, setRole] = useState<'admin' | 'provider' | 'user' | null>(null);
+  const [permissions, setPermissions] = useState<string[]>([]);
   const [loading, setLoading] = useState(true);
 
+  const fetchProfileData = async (userId: string) => {
+    // Fetch role
+    const { data: profile } = await supabase.from('profiles').select('role').eq('id', userId).single();
+    if (profile) setRole(profile.role);
+
+    // If provider, fetch permissions
+    if (profile?.role === 'provider') {
+      const { data: perms } = await supabase.from('provider_permissions').select('permission').eq('provider_id', userId);
+      if (perms) setPermissions(perms.map((p: any) => p.permission));
+    }
+  };
+
   useEffect(() => {
-    // Listen for auth state changes (login, signout, token refresh, etc.)
     const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
-      if (event === 'TOKEN_REFRESHED') {
-        // Token was refreshed successfully
-        setSession(session);
-        setUser(session?.user ?? null);
-      } else if (event === 'SIGNED_OUT') {
-        setSession(null);
-        setUser(null);
+      setSession(session);
+      setUser(session?.user ?? null);
+      if (session?.user) {
+        await fetchProfileData(session.user.id);
       } else {
-        setSession(session);
-        setUser(session?.user ?? null);
+        setRole(null);
+        setPermissions([]);
       }
       setLoading(false);
     });
 
-    // Check active sessions on mount
     supabase.auth.getSession().then(async ({ data: { session }, error }) => {
       if (error || (session && isTokenExpired(session))) {
-        // Session exists but token is expired and couldn't be refreshed — sign out
         await supabase.auth.signOut();
         setSession(null);
         setUser(null);
+        setRole(null);
+        setPermissions([]);
       } else {
         setSession(session);
         setUser(session?.user ?? null);
+        if (session?.user) await fetchProfileData(session.user.id);
       }
       setLoading(false);
     });
 
-    return () => {
-      subscription.unsubscribe();
-    };
+    return () => subscription.unsubscribe();
   }, []);
 
   return (
-    <AuthContext.Provider value={{ user, session, loading }}>
+    <AuthContext.Provider value={{ user, session, role, permissions, loading }}>
       {children}
     </AuthContext.Provider>
   );

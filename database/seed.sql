@@ -51,3 +51,9 @@ VALUES
 );
 
 -- Note: We don't insert bookings or reviews yet to keep the state clean.
+
+-- Seed default system settings
+INSERT INTO public.system_settings (key, value) VALUES 
+('active_payment_provider', 'flutterwave'),
+('platform_name', 'Oceanora Booking'),
+('currency', 'USD');

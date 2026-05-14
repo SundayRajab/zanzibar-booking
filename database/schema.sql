@@ -168,3 +168,30 @@ $$ language plpgsql security definer;
 create trigger on_auth_user_created
   after insert on auth.users
   for each row execute procedure public.handle_new_user();
+
+-- 6. System Settings to store configuration & active payment provider
+CREATE TABLE public.system_settings (
+  key text primary key,
+  value text not null,
+  description text,
+  updated_at timestamp with time zone default timezone('utc'::text, now()) not null
+);
+
+-- Enable RLS for system settings
+ALTER TABLE public.system_settings ENABLE ROW LEVEL SECURITY;
+CREATE POLICY "Anyone can read system settings" ON public.system_settings FOR SELECT USING ( true );
+
+-- 7. Audit Logs for tracking actions
+CREATE TABLE public.audit_logs (
+  id uuid default gen_random_uuid() primary key,
+  user_id uuid references auth.users on delete set null,
+  action_type text not null,
+  resource text not null,
+  description text,
+  created_at timestamp with time zone default timezone('utc'::text, now()) not null
+);
+
+-- Enable RLS for audit logs
+ALTER TABLE public.audit_logs ENABLE ROW LEVEL SECURITY;
+CREATE POLICY "Users can insert audit logs" ON public.audit_logs FOR INSERT WITH CHECK ( true );
+CREATE POLICY "Users can view their own audit logs" ON public.audit_logs FOR SELECT USING ( auth.uid() = user_id );

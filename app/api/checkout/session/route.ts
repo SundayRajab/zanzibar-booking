@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
-import { createFlutterwaveSession } from '../../../lib/flutterwave';
+import { PaymentFactory } from '../../../services/payment/PaymentFactory';
 
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
 const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!;
@@ -8,7 +8,7 @@ const supabase = createClient(supabaseUrl, supabaseKey);
 
 export async function POST(req: Request) {
   try {
-    const { bookingId } = await req.json();
+    const { bookingId, provider: requestProvider } = await req.json();
 
     if (!bookingId) {
       return NextResponse.json({ error: 'Missing booking ID' }, { status: 400 });
@@ -27,24 +27,20 @@ export async function POST(req: Request) {
 
     const origin = req.headers.get('origin') || 'http://localhost:3000';
 
-    // Create Flutterwave v4 Session
-    const session = await createFlutterwaveSession({
+    const provider = PaymentFactory.getPaymentProvider(requestProvider);
+
+    const session = await provider.initiatePayment({
+      bookingId: bookingId,
       amount: booking.total_price,
       currency: 'USD',
-      tx_ref: `oceanora-${bookingId}-${Date.now()}`,
-      customer: {
-        email: booking.customer_email,
-        name: booking.customer_name,
-        phone_number: booking.customer_phone,
-      },
-      customizations: {
-        title: 'Oceanora Booking',
-        description: `Payment for ${booking.listings?.title}`,
-      },
-      redirect_url: `${origin}/checkout/success?booking_id=${bookingId}`,
+      customerEmail: booking.customer_email || 'guest@example.com',
+      customerName: booking.customer_name || 'Guest',
+      customerPhone: booking.customer_phone,
+      description: `Payment for ${booking.listings?.title}`,
+      redirectUrl: `${origin}/checkout/success?booking_id=${bookingId}`,
     });
 
-    return NextResponse.json({ url: session.checkout_url });
+    return NextResponse.json({ url: session.checkoutUrl });
   } catch (error: any) {
     console.error('Checkout Session API Error:', error);
     return NextResponse.json({ error: error.message || 'Internal server error' }, { status: 500 });

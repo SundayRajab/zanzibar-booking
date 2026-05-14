@@ -11,13 +11,17 @@ export default function SignIn() {
   const [password, setPassword] = useState("")
   const [loading, setLoading] = useState(false)
   const [errorMsg, setErrorMsg] = useState("")
+  
+  // Handle redirect from URL if present
+  const searchParams = new URLSearchParams(typeof window !== 'undefined' ? window.location.search : '');
+  const redirectUrl = searchParams.get('redirect');
 
   const handleSignIn = async (e: React.FormEvent) => {
     e.preventDefault()
     setLoading(true)
     setErrorMsg("")
 
-    const { error } = await supabase.auth.signInWithPassword({
+    const { data, error } = await supabase.auth.signInWithPassword({
       email,
       password,
     })
@@ -26,8 +30,20 @@ export default function SignIn() {
       setErrorMsg(error.message)
       setLoading(false)
     } else {
-      router.push("/dashboard")
-      // Do not set loading to false here, keeps the button spinning until page navigates
+      // Fetch role to redirect appropriately
+      const { data: profile } = await supabase.from('profiles').select('role').eq('id', data.user?.id).single();
+      
+      const userRole = profile?.role || 'user';
+      
+      if (redirectUrl) {
+        router.push(redirectUrl);
+      } else if (userRole === 'admin') {
+        router.push('/admin');
+      } else if (userRole === 'provider') {
+        router.push('/provider');
+      } else {
+        router.push('/dashboard');
+      }
     }
   }
 
@@ -92,7 +108,7 @@ export default function SignIn() {
             )}
           </button>
           <p className="text-center text-sm text-zinc-500 dark:text-zinc-400 mt-4">
-            New to Oceanora? <Link href="/sign-up" className="text-blue-600 dark:text-cyan-400 font-semibold hover:underline">Create Account</Link>
+            New to Oceanora? <Link href={redirectUrl ? `/sign-up?redirect=${redirectUrl}` : "/sign-up"} className="text-blue-600 dark:text-cyan-400 font-semibold hover:underline">Create Account</Link>
           </p>
         </form>
       </div>

@@ -15,6 +15,10 @@ export default function SignUp() {
   const [errorMsg, setErrorMsg] = useState("");
   const [success, setSuccess] = useState(false);
 
+  // Handle redirect from URL if present
+  const searchParams = new URLSearchParams(typeof window !== 'undefined' ? window.location.search : '');
+  const redirectUrl = searchParams.get('redirect');
+
   const handleSignUp = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
@@ -35,7 +39,7 @@ export default function SignUp() {
       setErrorMsg(error.message);
     } else {
       setSuccess(true);
-      setTimeout(() => router.push("/dashboard"), 2000);
+      setTimeout(() => router.push(redirectUrl || "/dashboard"), 2000);
     }
     setLoading(false);
   };
@@ -65,25 +69,7 @@ export default function SignUp() {
           </div>
         ) : (
           <form onSubmit={handleSignUp} className="space-y-5">
-            <div>
-              <label className="block text-sm font-medium text-zinc-700 dark:text-zinc-300 mb-2">Account Type</label>
-              <div className="grid grid-cols-2 gap-4">
-                <button
-                  type="button"
-                  onClick={() => setRole("user")}
-                  className={`py-3 px-4 rounded-xl border-2 transition-all ${role === "user" ? "border-blue-500 bg-blue-50/50 dark:bg-blue-900/20 text-blue-700 dark:text-blue-300 font-semibold" : "border-zinc-200 dark:border-zinc-800 text-zinc-500 hover:border-blue-200"}`}
-                >
-                  Guest
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setRole("provider")}
-                  className={`py-3 px-4 rounded-xl border-2 transition-all ${role === "provider" ? "border-blue-500 bg-blue-50/50 dark:bg-blue-900/20 text-blue-700 dark:text-blue-300 font-semibold" : "border-zinc-200 dark:border-zinc-800 text-zinc-500 hover:border-blue-200"}`}
-                >
-                  Provider
-                </button>
-              </div>
-            </div>
+
 
             <div>
               <label className="block text-sm font-medium text-zinc-700 dark:text-zinc-300 mb-2">Full Name</label>
@@ -102,7 +88,7 @@ export default function SignUp() {
               {loading ? "Creating Account..." : "Create Account"}
             </button>
             <p className="text-center text-sm text-zinc-500 dark:text-zinc-400 mt-4">
-              Already have an account? <Link href="/sign-in" className="text-blue-600 dark:text-cyan-400 font-semibold hover:underline">Sign In</Link>
+              Already have an account? <Link href={redirectUrl ? `/sign-in?redirect=${redirectUrl}` : "/sign-in"} className="text-blue-600 dark:text-cyan-400 font-semibold hover:underline">Sign In</Link>
             </p>
           </form>
         )}

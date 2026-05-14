@@ -62,8 +62,8 @@ export default function TermsOfService() {
             <h3 className="text-xl font-bold text-zinc-900 dark:text-white mb-4">Legal Inquiries</h3>
             <p className="text-zinc-600 dark:text-zinc-400 mb-0">
               For any legal questions or clarification regarding these terms, please contact us at{" "}
-              <a href="mailto:ibnsunmday@gmail.com" className="text-blue-600 dark:text-cyan-400 font-medium hover:underline">
-                ibnsunmday@gmail.com
+              <a href="mailto:rajeevraheem@gmail.com" className="text-blue-600 dark:text-cyan-400 font-medium hover:underline">
+                rajeevraheem@gmail.com
               </a>
             </p>
           </div>

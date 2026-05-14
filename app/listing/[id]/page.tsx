@@ -45,6 +45,7 @@ export default function ListingDetailPage() {
   const [customerPhone, setCustomerPhone] = useState("")
   const [isSubmitted, setIsSubmitted] = useState(false)
   const [submitting, setSubmitting] = useState(false)
+  const [bookingError, setBookingError] = useState("")
 
   // Reviews state
   const [reviews, setReviews] = useState<Review[]>([])
@@ -221,12 +222,13 @@ export default function ListingDetailPage() {
   const calculatedDays = calculateDays();
 
   const handleBookNow = async () => {
+    setBookingError("");
     if (!startDate || (!isTour && !endDate)) {
-      alert("Please select your dates first.")
+      setBookingError("Please select your dates first.")
       return
     }
     if (!customerName || !customerEmail || !customerPhone) {
-      alert("Please enter your contact details so we can coordinate your booking.")
+      setBookingError("Please enter your contact details so we can coordinate your booking.")
       return
     }
 
@@ -238,17 +240,26 @@ export default function ListingDetailPage() {
     const finalEndDate = isTour && !endDate ? startDate : endDate;
 
     // Real-Time Availability Pre-Check via Frontend (Double Booking Prevention Validation)
+    // We must block BOTH 'confirmed' and 'pending_payment' bookings to prevent double-booking during checkout.
     const { data: overlappingBookings } = await supabase
       .from('bookings')
-      .select('id')
+      .select('id, status, created_at')
       .eq('listing_id', listing.id)
-      .eq('status', 'confirmed')
+      .in('status', ['confirmed', 'pending_payment'])
       .lte('start_date', finalEndDate)
       .gte('end_date', startDate)
 
-    if (overlappingBookings && overlappingBookings.length > 0) {
+    // Filter out expired pending_payment bookings (older than 10 minutes)
+    const validOverlaps = overlappingBookings?.filter(b => {
+      if (b.status === 'confirmed') return true;
+      const createdTime = new Date(b.created_at).getTime();
+      const tenMinutesAgo = Date.now() - 10 * 60 * 1000;
+      return createdTime > tenMinutesAgo; // if it's newer than 10 mins, it's a valid lock
+    });
+
+    if (validOverlaps && validOverlaps.length > 0) {
       setSubmitting(false)
-      alert("SORRY: Someone just booked these exact dates! Please select different dates.")
+      setBookingError("These dates are no longer available. Please select different dates.")
       return
     }
 
@@ -260,10 +271,15 @@ export default function ListingDetailPage() {
       ...(isCar && { mileagePackage }),
     };
 
-    const { data, error } = await supabase
+    // Optimistic UI: Generate ID and redirect instantly to eliminate waiting
+    const newBookingId = crypto.randomUUID();
+
+    // Fire DB insert asynchronously (fire-and-forget from the client's perspective)
+    supabase
       .from('bookings')
       .insert([
         {
+          id: newBookingId,
           user_id: userId,
           listing_id: listing.id,
           customer_name: customerName,
@@ -271,25 +287,17 @@ export default function ListingDetailPage() {
           customer_phone: customerPhone,
           start_date: startDate,
           end_date: finalEndDate,
-          status: 'pending',
+          status: 'pending_payment',
           payment_status: 'unpaid',
           booking_details: extendedBookingDetails,
           total_price: totalPrice
         }
-      ])
-      .select();
+      ]).then(({ error }) => {
+        if (error) console.error("Async Booking Error:", error)
+      });
 
-    setSubmitting(false)
-
-    if (error) {
-      alert("Failed to submit booking: " + (error?.message || "Unknown error"));
-    } else if (data && data[0]) {
-      // Redirect to the checkout portal for payment
-      router.push(`/checkout/${data[0].id}`);
-    } else {
-      // Fallback if data is not returned (unlikely with Supabase unless select is missing)
-      setIsSubmitted(true);
-    }
+    // Instantly route to the checkout portal for payment
+    router.push(`/checkout/${newBookingId}`);
   }
 
   if (isSubmitted) {
@@ -667,6 +675,12 @@ export default function ListingDetailPage() {
                     )}
                   </div>
                 </div>
+
+                {bookingError && (
+                  <div className="mb-4 p-3 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800/50 rounded-xl text-red-700 dark:text-red-400 text-sm font-medium animate-pulse">
+                    {bookingError}
+                  </div>
+                )}
 
                 <button 
                   onClick={handleBookNow}

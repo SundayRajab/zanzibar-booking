@@ -37,32 +37,52 @@ export async function POST(req: Request) {
   // Handle the checkout.session.completed event
   if (event.type === 'checkout.session.completed') {
     const session = event.data.object as Stripe.Checkout.Session
-
-    // Retrieve the booking ID from the metadata previously attached in checkout session creation
     const bookingId = session.metadata?.bookingId
 
     if (bookingId) {
-      // 1. Update the database: mark as paid and confirm the booking instantly!
-      // 2. This triggers the PostgreSQL `prevent_double_booking` logic.
-      // 3. If someone managed to book those dates while payment was processing, the DB will violently reject the update here, preventing overbooking.
-      const { error } = await supabase
+      // 1. Fetch booking to get total price and listing ID
+      const { data: booking, error: fetchErr } = await supabase
         .from('bookings')
-        .update({
-          payment_status: 'paid',
-          status: 'confirmed',
-          stripe_session_id: session.id
-        })
+        .select('*, listings(user_id)')
         .eq('id', bookingId)
+        .single();
 
-      if (error) {
-        // If error.message includes 'DOUBLE_BOOKING_PREVENTED', trigger a refund and email the user.
-        console.error('Error updating booking status (Potentially overlapping dates!):', error)
-        // TODO: Trigger Stripe Refund API here, notify via Twilio/Resend.
-        return NextResponse.json({ error: 'Database update failed - potential overlap' }, { status: 500 })
+      if (!fetchErr && booking) {
+        // 2. Update booking to confirmed
+        const { error: updateErr } = await supabase
+          .from('bookings')
+          .update({
+            payment_status: 'paid',
+            status: 'confirmed',
+            stripe_session_id: session.id
+          })
+          .eq('id', bookingId)
+
+        if (!updateErr) {
+          console.log(`Booking ${bookingId} successfully confirmed!`);
+          
+          // 3. Generate Provider Earnings (e.g., 15% system commission)
+          const providerId = booking.listings?.user_id; // Assume listings.user_id is the provider
+          if (providerId) {
+            const totalAmount = Number(booking.total_price) || 0;
+            const commission = totalAmount * 0.15; // 15% platform fee
+            const earnings = totalAmount - commission;
+
+            await supabase.from('provider_payouts').insert({
+              provider_id: providerId,
+              booking_id: bookingId,
+              total_amount: totalAmount,
+              commission_amount: commission,
+              provider_earnings: earnings,
+              payout_status: 'pending'
+            });
+          }
+
+          // TODO: Fire Email / WhatsApp notification via Resend/Twilio confirming dates.
+        } else {
+           console.error('Error updating booking status:', updateErr);
+        }
       }
-      
-      console.log(`Booking ${bookingId} successfully locked and paid!`)
-      // TODO: Fire Email / WhatsApp notification via Resend/Twilio confirming dates.
     }
   }
 

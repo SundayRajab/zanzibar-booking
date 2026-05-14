@@ -1,88 +1,99 @@
 "use client";
 
-import { useAuth } from "../lib/AuthContext";
 import { useEffect, useState } from "react";
-import { supabase } from "../lib/supabase";
+import Link from "next/link";
+import { supabase } from "@/app/lib/supabase";
+import { useAuth } from "@/app/lib/AuthContext";
 
-type Profile = {
-  full_name: string;
-  loyalty_points: number;
-}
-
-type Booking = {
+type Listing = {
   id: string;
-  start_date: string;
-  end_date: string;
-  status: string;
-  payment_status: string;
-  total_price: number;
-  listings: {
-    title: string;
-    category: string;
-  }
-}
+  title: string;
+  category: string;
+  location: string;
+  price: number;
+  images: string[];
+};
 
-export default function DashboardOverview() {
+export default function UserDashboardPage() {
   const { user } = useAuth();
-  const [profile, setProfile] = useState<Profile | null>(null);
-  const [bookings, setBookings] = useState<Booking[]>([]);
+  const [listings, setListings] = useState<Listing[]>([]);
+  const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    if (!user) return;
-    const fetchData = async () => {
-      // Fetch Profile
-      const { data: profileData } = await supabase.from('profiles').select('*').eq('id', user.id).single();
-      if (profileData) setProfile(profileData);
-
-      // Fetch Bookings
-      const { data: bookingData } = await supabase
-        .from('bookings')
-        .select('*, listings(title, category)')
-        .eq('user_id', user.id)
-        .order('created_at', { ascending: false });
-      
-      if (bookingData) setBookings(bookingData);
-    };
-    fetchData();
-  }, [user]);
+    async function fetchListings() {
+      const { data, error } = await supabase
+        .from("listings")
+        .select("*")
+        .order("created_at", { ascending: false })
+        .limit(3); // show latest 3 recommendations
+      if (data) setListings(data);
+      setLoading(false);
+    }
+    fetchListings();
+  }, []);
 
   return (
-    <div className="space-y-6">
-      <h1 className="text-3xl font-bold text-black dark:text-white mb-8">Dashboard Overview</h1>
-      
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        <div className="bg-gradient-to-br from-blue-600 to-cyan-500 rounded-3xl p-8 text-white shadow-xl shadow-cyan-500/20">
-          <h3 className="text-blue-100 font-medium mb-1 capitalize">{profile?.full_name?.split(' ')[0] || 'User'} Member</h3>
-          <p className="text-2xl font-bold mb-6 truncate">{profile?.full_name || user?.email}</p>
-          <div className="flex items-end justify-between">
-            <div>
-              <p className="text-sm text-blue-100 mb-1">Loyalty Points</p>
-              <p className="text-4xl font-extrabold">{profile?.loyalty_points || 0}</p>
-            </div>
-            <svg className="w-12 h-12 text-white/40" fill="currentColor" viewBox="0 0 24 24"><path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/></svg>
+    <div className="space-y-8">
+      {/* Welcome Banner */}
+      <div className="bg-gradient-to-r from-blue-600 to-cyan-500 rounded-3xl p-8 sm:p-12 text-white shadow-xl relative overflow-hidden">
+        <div className="relative z-10">
+          <h1 className="text-3xl sm:text-5xl font-black mb-4 tracking-tight">
+            Welcome back{user?.user_metadata?.full_name ? `, ${user.user_metadata.full_name.split(' ')[0]}` : ''}!
+          </h1>
+          <p className="text-blue-100 text-lg max-w-xl mb-8">
+            Ready for your next luxury getaway in Zanzibar? Explore our curated recommendations or manage your upcoming trips.
+          </p>
+          <div className="flex gap-4">
+            <Link href="/" className="px-6 py-3 bg-white text-blue-600 font-bold rounded-xl shadow-sm hover:shadow-md hover:-translate-y-0.5 transition-all">
+              Explore Zanzibar
+            </Link>
           </div>
         </div>
+        {/* Decorative background circle */}
+        <div className="absolute -right-20 -bottom-20 w-96 h-96 bg-white opacity-10 rounded-full blur-3xl pointer-events-none"></div>
+      </div>
+
+      {/* Recommended Stays (Similar to Home Page) */}
+      <div>
+        <h2 className="text-2xl font-bold text-black dark:text-white mb-6">Recommended for You</h2>
         
-        <div className="bg-white dark:bg-zinc-900/80 border border-zinc-200 dark:border-zinc-800 rounded-3xl p-8 shadow-sm">
-          <h3 className="text-lg font-bold text-black dark:text-white mb-6">Active Trips</h3>
-          <div className="space-y-4">
-             {bookings.length > 0 ? bookings.slice(0, 3).map((b) => (
-                <div key={b.id} className="flex justify-between items-center p-4 bg-zinc-50 dark:bg-zinc-950 rounded-2xl border border-zinc-100 dark:border-zinc-800">
-                  <div className="flex flex-col">
-                    <span className="text-sm font-bold text-black dark:text-white truncate max-w-[150px]">{b.listings?.title}</span>
-                    <span className="text-xs text-zinc-500">{new Date(b.start_date).toLocaleDateString()}</span>
+        {loading ? (
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
+            {[...Array(3)].map((_, i) => (
+              <div key={i} className="bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-2xl aspect-[4/3] animate-pulse"></div>
+            ))}
+          </div>
+        ) : (
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
+            {listings.map(listing => (
+              <Link
+                key={listing.id}
+                href={`/listing/${listing.id}`}
+                className="group bg-white dark:bg-zinc-900/40 rounded-2xl overflow-hidden border border-zinc-200 dark:border-zinc-800 hover:shadow-xl transition-all duration-300 flex flex-col"
+              >
+                <div className="relative overflow-hidden aspect-[4/3]">
+                  <img
+                    src={listing.images && listing.images[0] ? listing.images[0] : `https://images.unsplash.com/photo-1590523277543-a94d2e4eb00b?auto=format&fit=crop&w=800&q=80&sig=${listing.id}`}
+                    alt={listing.title}
+                    className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-700 ease-out"
+                  />
+                  <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-transparent to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300"/>
+                </div>
+                <div className="p-5 flex flex-col flex-grow">
+                  <h3 className="text-lg font-bold text-black dark:text-white mb-1 line-clamp-1 group-hover:text-blue-600 dark:group-hover:text-cyan-400 transition-colors">
+                    {listing.title}
+                  </h3>
+                  <div className="text-zinc-500 dark:text-zinc-400 text-sm mb-4">
+                    {listing.location}
                   </div>
-                  <div className="text-right">
-                    <span className={`text-[10px] uppercase font-extrabold px-2 py-0.5 rounded-full ${b.payment_status === 'paid' ? 'bg-green-100 text-green-700' : 'bg-yellow-100 text-yellow-700'}`}>
-                      {b.payment_status}
-                    </span>
+                  <div className="mt-auto">
+                    <p className="font-extrabold text-xl text-black dark:text-white">${listing.price}<span className="text-sm font-normal text-zinc-500 dark:text-zinc-400">/night</span></p>
                   </div>
                 </div>
-             )) : (
-                <p className="text-sm text-zinc-500 py-4 italic">No active bookings found.</p>
-             )}
+              </Link>
+            ))}
           </div>
-        </div>
+        )}
       </div>
     </div>
   );
