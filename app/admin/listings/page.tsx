@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react"
 import { supabase } from "@/app/lib/supabase"
+import { useAuth } from "@/app/lib/AuthContext"
 
 type Listing = {
   id: string
@@ -15,6 +16,7 @@ type Listing = {
 }
 
 export default function AdminListingsPage() {
+  const { user, loading: authLoading } = useAuth()
   const [listings, setListings] = useState<Listing[]>([])
   const [loading, setLoading] = useState(true)
   const [filterCategory, setFilterCategory] = useState("all")
@@ -30,8 +32,10 @@ export default function AdminListingsPage() {
   const [submitting, setSubmitting] = useState(false)
 
   useEffect(() => {
-    fetchListings()
-  }, [])
+    if (!authLoading && user) {
+      fetchListings()
+    }
+  }, [authLoading, user])
 
   const fetchListings = async () => {
     setLoading(true)

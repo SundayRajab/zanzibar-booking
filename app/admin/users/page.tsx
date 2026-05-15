@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react"
 import { supabase } from "@/app/lib/supabase"
+import { useAuth } from "@/app/lib/AuthContext"
 
 type Profile = {
   id: string
@@ -13,10 +14,10 @@ type Profile = {
 }
 
 export default function AdminUsersPage() {
+  const { user, loading: authLoading, session } = useAuth()
   const [users, setUsers] = useState<Profile[]>([])
   const [loading, setLoading] = useState(true)
   const [actionLoading, setActionLoading] = useState(false)
-  const [session, setSession] = useState<any>(null)
 
   // Form states
   const [isModalOpen, setIsModalOpen] = useState(false)
@@ -26,9 +27,10 @@ export default function AdminUsersPage() {
   const [role, setRole] = useState("user")
 
   useEffect(() => {
-    fetchUsers()
-    supabase.auth.getSession().then(({ data }) => setSession(data.session))
-  }, [])
+    if (!authLoading && user) {
+      fetchUsers()
+    }
+  }, [authLoading, user])
 
   const fetchUsers = async () => {
     setLoading(true)

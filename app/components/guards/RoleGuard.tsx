@@ -23,7 +23,7 @@ export default function RoleGuard({ children, allowedRoles, redirectTo = '/sign-
       } else if (role && !allowedRoles.includes(role)) {
         // Redirect based on actual role
         if (role === 'admin') router.push('/admin');
-        else if (role === 'provider') router.push('/provider');
+        else if (role === 'provider') router.push('/dashboard/provider');
         else router.push('/dashboard');
       }
     }

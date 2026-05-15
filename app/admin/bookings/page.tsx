@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react"
 import { supabase } from "@/app/lib/supabase"
+import { useAuth } from "@/app/lib/AuthContext"
 
 type Listing = {
   id: string
@@ -27,13 +28,16 @@ type Booking = {
 }
 
 export default function AdminBookingsPage() {
+  const { user, loading: authLoading } = useAuth()
   const [bookings, setBookings] = useState<Booking[]>([])
   const [loading, setLoading] = useState(true)
   const [statusFilter, setStatusFilter] = useState("all")
 
   useEffect(() => {
-    fetchBookings()
-  }, [])
+    if (!authLoading && user) {
+      fetchBookings()
+    }
+  }, [authLoading, user])
 
   const fetchBookings = async () => {
     setLoading(true)

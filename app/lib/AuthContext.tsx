@@ -10,9 +10,19 @@ type AuthContextType = {
   role: 'admin' | 'provider' | 'user' | null;
   permissions: string[];
   loading: boolean;
+  signOut: () => Promise<void>;
+  refreshUser: () => Promise<void>;
 };
 
-const AuthContext = createContext<AuthContextType>({ user: null, session: null, role: null, permissions: [], loading: true });
+const AuthContext = createContext<AuthContextType>({ 
+  user: null, 
+  session: null, 
+  role: null, 
+  permissions: [], 
+  loading: true,
+  signOut: async () => {},
+  refreshUser: async () => {}
+});
 
 export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
   const [user, setUser] = useState<User | null>(null);
@@ -33,10 +43,48 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
     }
   };
 
+  const refreshUser = async () => {
+    const { data: { user: updatedUser } } = await supabase.auth.getUser();
+    setUser(updatedUser);
+    if (updatedUser) await fetchProfileData(updatedUser.id);
+  };
+
+  const signOut = async () => {
+    await supabase.auth.signOut();
+    window.location.href = '/'; // Force redirect to home
+  };
+
   useEffect(() => {
+    let mounted = true;
+
+    async function initializeAuth() {
+      // Get initial session safely
+      const { data: { session }, error } = await supabase.auth.getSession();
+      
+      if (!mounted) return;
+
+      if (error || (session && isTokenExpired(session))) {
+        await supabase.auth.signOut();
+        setSession(null);
+        setUser(null);
+        setRole(null);
+        setPermissions([]);
+      } else if (session) {
+        setSession(session);
+        setUser(session.user);
+        await fetchProfileData(session.user.id);
+      }
+      setLoading(false);
+    }
+
+    initializeAuth();
+
     const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
+      if (!mounted) return;
+
       setSession(session);
       setUser(session?.user ?? null);
+
       if (session?.user) {
         await fetchProfileData(session.user.id);
       } else {
@@ -46,26 +94,14 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
       setLoading(false);
     });
 
-    supabase.auth.getSession().then(async ({ data: { session }, error }) => {
-      if (error || (session && isTokenExpired(session))) {
-        await supabase.auth.signOut();
-        setSession(null);
-        setUser(null);
-        setRole(null);
-        setPermissions([]);
-      } else {
-        setSession(session);
-        setUser(session?.user ?? null);
-        if (session?.user) await fetchProfileData(session.user.id);
-      }
-      setLoading(false);
-    });
-
-    return () => subscription.unsubscribe();
+    return () => {
+      mounted = false;
+      subscription.unsubscribe();
+    };
   }, []);
 
   return (
-    <AuthContext.Provider value={{ user, session, role, permissions, loading }}>
+    <AuthContext.Provider value={{ user, session, role, permissions, loading, signOut, refreshUser }}>
       {children}
     </AuthContext.Provider>
   );
